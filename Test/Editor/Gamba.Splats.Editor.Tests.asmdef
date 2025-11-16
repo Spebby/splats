@@ -1,0 +1,16 @@
+{
+    "name": "Gamba.Splats.Editor.Tests",
+    "rootNamespace": "Gamba.Splats.Editor.Tests",
+    "references": [
+        "GUID:d7c9c595bd79100ae96ad406ada5b785"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,16 @@
+{
+    "name": "Gamba.Spalts.Runtime.Tests",
+    "rootNamespace": "Gamba.Splats.Runtime.Tests",
+    "references": [
+        "GUID:2671253a9924989308173660915b0873"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

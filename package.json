@@ -1,0 +1,7 @@
+{
+	"name": "com.gamba.splats",
+	"version": "0.0.0",
+	"displayName": "Splats",
+	"description": "Efficient GPU based splats system for top-down games.",
+	"unity": "6000.2"
+}
