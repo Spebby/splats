@@ -5,7 +5,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 
-namespace Gamba.Splats {
+namespace Splats {
     public class BasicSplatsMaker : ISplatsManager, IFixedUpdatable {
         ISplatsConfig config;
 
@@ -25,7 +25,7 @@ namespace Gamba.Splats {
             this.RegisterInManager();
         }
 
-        public void Spawn(Vector3 position, Quaternion rotation, SplatParams @params) {
+        public void Spawn(Vector2 position, Quaternion rotation, SplatParams @params) {
             back++;
             if (back == count) {
                 count <<= 1;
@@ -50,7 +50,7 @@ namespace Gamba.Splats {
         /// <param name="position"></param>
         /// <param name="radius"></param>
         /// <returns>A value of default is a standin for null</returns>
-        public SplatHit Query(Vector3 position, float radius) {
+        public SplatHit Query(Vector2 position, float radius) {
             Bounds bound = new(position, Vector3.one * (radius * 2f));
             foreach (Bounds b in bounds) {
                 if (!b.Intersects(bound)) continue;
@@ -60,12 +60,12 @@ namespace Gamba.Splats {
             return default;
         }
 
-        public NativeArray<SplatHit> Query(NativeArray<Vector3> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp) {
+        public NativeArray<SplatHit> Query(NativeArray<Vector2> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp) {
             if (radii.Length != positions.Length) throw new ArgumentException("positions and radii must be same length.");
 
             NativeArray<SplatHit> results = new(positions.Length, allocator);
             for (int i = 0; i < positions.Length; i++) {
-                Vector3 pos = positions[i];
+                Vector2 pos = positions[i];
                 float   r   = radii[i];
 
                 Bounds queryBound = new(pos, Vector3.one * (r * 2f));

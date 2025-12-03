@@ -1,7 +1,8 @@
 {
-    "name": "Gamba.Splats.Runtime",
-    "rootNamespace": "Gamba.Splats",
+    "name": "Splats.Runtime",
+    "rootNamespace": "Splats",
     "references": [
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:a086f2f33537541d1b1e8cde513be9e4"
     ],
     "includePlatforms": [],

@@ -3,7 +3,7 @@ using Gilzoide.UpdateManager;
 using UnityEngine;
 
 
-namespace Gamba.Splats.TextureChunks {
+namespace Splats.TextureChunks {
     public class ChunkManager : IFixedUpdatable {
         readonly ChunkManagerSettings settings;
         Transform target;

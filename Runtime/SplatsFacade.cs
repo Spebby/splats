@@ -1,12 +1,11 @@
 using System;
-using Gamba.Splats.TextureChunks;
+using Splats.TextureChunks;
 using Unity.Collections;
-using Unity.Jobs;
 using UnityEngine;
 
 
-namespace Gamba.Splats {
-    public static class Splats {
+namespace Splats {
+    public static class SplatsMan {
         static ISplatsManager _splatsManager = new BasicSplatsMaker();
         
         public static Action<int, Vector2> OnSplat;

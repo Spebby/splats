@@ -1,8 +1,8 @@
-using Gamba.Splats.TextureChunks;
+using Splats.TextureChunks;
 using UnityEngine;
 
 
-namespace Gamba.Splats {
+namespace Splats {
     [CreateAssetMenu(menuName = "Splats/Splats Config")]
     public class SplatsConfig : ScriptableObject, ISplatsConfig {
         [SerializeField, Min(64)] int bufferSize;
