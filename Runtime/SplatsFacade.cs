@@ -1,4 +1,7 @@
+using System;
+using Gamba.Splats.TextureChunks;
 using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 
 
@@ -6,35 +9,67 @@ namespace Gamba.Splats {
     public static class Splats {
         static ISplatsManager _splatsManager = new BasicSplatsMaker();
         
-        internal static void Init(ISplatsManager manager, ISplatsConfig config) {
+        public static Action<int, Vector2> OnSplat;
+        
+        // make internal at some point or only accessible through controled bootstrapper
+        public static void Init(ISplatsManager manager, ISplatsConfig config) {
             _splatsManager = manager;
             manager.Init(config);
         }
+
+        // this is not ideal but is acceptable for now
+        // Doing this b/c classes don't auto destruct between scene loads in Unity. So until I figure out
+        // how to properly do this, we'll have to go with this for now.
+        public static void Denit() {
+            _splatsManager = null;
+            OnSplat        = null;
+        }
         
-        public static void Spawn(Vector3 position, Quaternion rotation, SplatParams @params) {
+        public static void Spawn(Vector2 position, Quaternion rotation, SplatParams @params) {
             _splatsManager.Spawn(position, rotation, @params);
+            OnSplat?.Invoke(@params.ID, position);
         }
 
-        public static void Spawn(Vector3 position, Quaternion? rotation) {
-            _splatsManager.Spawn(position, rotation ?? Quaternion.identity, new SplatParams());
+        public static void Edit(Vector2 pos, SplatEditData edit) {
+            
         }
 
-        public static SplatHit Query(Vector3 position, float radius) {
+        public static void RequestQuery(Vector2 position, Action<int> onComplete) {
+            throw new System.NotImplementedException();
+        }
+
+        public static void RequestQuerySplatEdge(Vector2 position, Action<int, NativeArray<Vector2>> OnComplete) {
+            throw new System.NotImplementedException();
+        }
+        
+        public static SplatHit Query(Vector2 position, float radius) {
             return _splatsManager.Query(position, radius);
         }
 
-        public static NativeArray<SplatHit> Query(NativeArray<Vector3> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp) {
+        public static NativeArray<SplatHit> Query(NativeArray<Vector2> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp) {
             return _splatsManager.Query(positions, radii, allocator);
         }
+        
+        /*
+        public static JobHandle Query(NativeArray<Vector3> positions, NativeArray<float> radii, out NativeArray<SplatHit> hits, Allocator allocator = Allocator.Temp) {
+            //return _splatsManager.Query(positions, radii, allocator);
+            return null;
+            //return _splatsManager.Query(positions, radii, allocator);
+        }
+        */
+    }
+
+    public enum SplatQueryType {
+        
     }
 
     public interface ISplatsManager {
         // this is prolly bad
         internal void Init(ISplatsConfig conf);
         
-        void Spawn(Vector3 position, Quaternion rotation, SplatParams @params);
-        SplatHit Query(Vector3 position, float radius);
-        NativeArray<SplatHit> Query(NativeArray<Vector3> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp);
+        void Spawn(Vector2 position, Quaternion rotation, SplatParams @params);
+        SplatHit Query(Vector2 position, float radius);
+        NativeArray<SplatHit> Query(NativeArray<Vector2> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp);
     }
     
     public readonly struct SplatParams {
@@ -43,12 +78,15 @@ namespace Gamba.Splats {
         public readonly Vector2 Sheer;
         // temp
         public readonly GameObject Object;
+        public readonly int ID;
 
         public SplatParams(GameObject obj, Vector2 sheer, float size = 1f, float lifetime = 10f) {
             Size = Mathf.Clamp(size, 0f, float.MaxValue);
             Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
             Sheer = sheer;
             Object = obj;
+
+            ID = 0;
         }
 
         public SplatParams(GameObject obj, float size = 1f, float lifetime = 10f) {
@@ -56,18 +94,47 @@ namespace Gamba.Splats {
             Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
             Sheer    = new Vector2(1, 1);
             Object = obj;
+
+            ID = 0;
+        }
+    }
+
+ 
+    public readonly struct SplatEditData {
+        public readonly Type EditType;
+        public readonly int SourceID;
+        public readonly int TargetID;
+        public readonly float Radius;
+        
+        
+        public SplatEditData(Type type, int sourceID, int targetID, float radius = 0.25f) {
+            EditType = type;
+            SourceID = sourceID;
+            TargetID = targetID;
+            Radius = radius;
+        }
+
+
+        public enum Type {
+            Remove,
+            Replace
         }
     }
 
     public readonly struct SplatHit {
         public readonly int ID;
+        public readonly float Lifetime;
 
-        public SplatHit(int id) {
+        public SplatHit(int id, float lifetime = 0) {
             ID = id;
+            Lifetime = lifetime;
         }
     }
    
     public interface ISplatsConfig {
         int BufferSize { get; }
+        int PixelsPerUnit { get; }
+        
+        ChunkManagerSettings cm_Settings { get; }
     }
 }
