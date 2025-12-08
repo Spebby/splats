@@ -1,10 +1,11 @@
 {
-    "name": "Gamba.Splats.Editor",
-    "rootNamespace": "Gamba.Splats.Editor",
-    "references": [],
-    "includePlatforms": [
-        "Editor"
+    "name": "Splats.Samples",
+    "rootNamespace": "Splats",
+    "references": [
+        "GUID:2671253a9924989308173660915b0873",
+        "GUID:a086f2f33537541d1b1e8cde513be9e4"
     ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

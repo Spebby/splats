@@ -8,7 +8,7 @@ namespace Splats.TextureChunks {
         readonly ChunkManagerSettings settings;
         Transform target;
 
-        public Vector2Int[] Chunks;
+        public Vector2Int[] Chunks { get; private set; }
         public Vector2Int CentreChunk => Chunks[Chunks.Length / 2];
         public int ChunkSize => settings.ChunkSize;
         public int Layers => settings.Layers;
@@ -26,9 +26,24 @@ namespace Splats.TextureChunks {
         ~ChunkManager() {
             this.UnregisterInManager();
         }
+
+        public int PosToChunkIndex(Vector2 position) => PosToChunkIndex(new Vector2Int(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y)));
+        
+        public int PosToChunkIndex(Vector2Int pos) {
+            int n = Layers + Layers - 1;
+            int x = PosToChunkCoord(pos.x, ChunkSize);
+            int y = PosToChunkCoord(pos.y, ChunkSize);
+            if (x < 0 || n <= x || y < 0 || n <= y) return -1;            
+
+            return XYToIndex(x, y, n);
+        }
+        
         
         public Vector2 ChunkToWorld(Vector2Int chunk) => chunk * ChunkSize;
+        public Vector2 ChunkToWorld(Vector2 chunk) => chunk * ChunkSize;
         public Vector2 ChunkToWorldBL(Vector2Int chunk) => new(chunk.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunk.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
+        public Vector2 ChunkToWorldBL(Vector2 chunk) => new(chunk.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunk.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
+        
         public void SetTarget(Transform target) => this.target = target;
 
         public void ManagedFixedUpdate() {
@@ -64,9 +79,23 @@ namespace Splats.TextureChunks {
 
             return chunks;
         }
-
-        static int PosToChunkCoord(int x, int chunkSize) => Mathf.FloorToInt((x + chunkSize * 0.5f) / chunkSize);
+        
+        // -(2ny - n^2 -2x + 1) / 2
+        internal static int XYToIndex(int x, int y, int n) => -(2 * n * y - n * n - 2 * x + 1) / 2;
+        static int PosToChunkCoord(int p, int chunkSize) => Mathf.FloorToInt((p + chunkSize * 0.5f) / chunkSize);
         static int ChunkCount(int n) => (4 * n * n) - (4 * n) + 1;
         #endregion
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+

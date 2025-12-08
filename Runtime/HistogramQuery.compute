@@ -1,0 +1,85 @@
+#pragma kernel Query
+
+Texture2DArray<half2> _Chunks;
+StructuredBuffer<int> _SliceMap;
+StructuredBuffer<float2> _ChunkWorldOrigins; // per logical chunk, world-space origin
+StructuredBuffer<int> _ChunkPixelsPerUnit;   // same length as chunks
+
+// Query parameters (C# will upload array)
+struct SQueryParams {
+    uint   chunkIndex;
+    int    minPx;
+    int    minPy;
+    int    maxPx;
+    int    maxPy;
+    float2 circleCenter;
+    float  radius;
+};
+
+StructuredBuffer<SQueryParams> _QueryParams;
+RWStructuredBuffer<uint> _OutValues;
+
+#define HISTO_SIZE 256
+groupshared uint g_Histogram[HISTO_SIZE];
+
+// This version is likely locked to 64 pixels per version, which is probably fine but may need to be rewritten later
+[numthreads(8,8,1)]
+void Query(uint3 tid  : SV_DispatchThreadID,
+           uint3 gid  : SV_GroupID,
+           uint3 gtid : SV_GroupThreadID) {
+    uint queryID = gid.x;
+    SQueryParams qp = _QueryParams[queryID];
+
+    // threadgroup-local histogram init
+    if (gtid.x == 0 && gtid.y == 0) {
+        [unroll]
+        for (int i = 0; i < HISTO_SIZE; i++) {
+            g_Histogram[i] = 0;
+        }
+    }
+    
+    GroupMemoryBarrierWithGroupSync();
+
+    // One full dispatch covers the entire region, Pixel coordinates from tid
+    int px = qp.minPx + tid.x;
+    int py = qp.minPy + tid.y;
+
+    if (px >= qp.maxPx || py >= qp.maxPy)
+        return;
+
+    // Chunk / world lookup
+    int slice       = _SliceMap[qp.chunkIndex];
+    float2 origin   = _ChunkWorldOrigins[qp.chunkIndex];
+    int ppu         = _ChunkPixelsPerUnit[qp.chunkIndex];
+
+    float2 worldPos = float2(px, py) / ppu + origin;
+
+    float2 d = worldPos - qp.circleCenter;
+    if (dot(d, d) <= qp.radius * qp.radius) {
+        half2 h = _Chunks[int3(px, py, slice)];
+        uint v  = h.x;
+
+        if (v > 0 && v < HISTO_SIZE)
+            InterlockedAdd(g_Histogram[v], 1);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    // Per-query reduction (thread 0,0 in group 0)
+    // Only run this in the *first* threadgroup (gid.y == 0)
+    if (gid.y == 0 && gtid.x == 0 && gtid.y == 0) {
+        uint maxCount = 0;
+        uint bestVal  = 0;
+
+        [unroll]
+        for (uint i = 1; i < HISTO_SIZE; i++) {
+            uint c = g_Histogram[i];
+            if (c > maxCount) {
+                maxCount = c;
+                bestVal = i;
+            }
+        }
+
+        _OutValues[queryID] = bestVal;
+    }
+}

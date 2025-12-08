@@ -7,8 +7,10 @@ namespace Splats {
     public class SplatsConfig : ScriptableObject, ISplatsConfig {
         [SerializeField, Min(64)] int bufferSize;
         [SerializeField, Min(1)] int pixelsPerUnit = 16;
-        [SerializeField] ChunkManagerSettings chunkManagerSettings;
         
+        [Header("Configs")]
+        [SerializeField] ChunkManagerSettings chunkManagerSettings;
+
         public int BufferSize => bufferSize;
         public int PixelsPerUnit => pixelsPerUnit;
         public ChunkManagerSettings cm_Settings => chunkManagerSettings;

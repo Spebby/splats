@@ -8,7 +8,7 @@ namespace Splats {
     public static class SplatsMan {
         static ISplatsManager _splatsManager = new BasicSplatsMaker();
         
-        public static Action<int, Vector2> OnSplat;
+        public static Action<uint, Vector2> OnSplat;
         
         // make internal at some point or only accessible through controled bootstrapper
         public static void Init(ISplatsManager manager, ISplatsConfig config) {
@@ -33,11 +33,11 @@ namespace Splats {
             
         }
 
-        public static void RequestQuery(Vector2 position, Action<int> onComplete) {
+        public static void RequestQuery(Vector2 position, Action<uint> onComplete) {
             throw new System.NotImplementedException();
         }
 
-        public static void RequestQuerySplatEdge(Vector2 position, Action<int, NativeArray<Vector2>> OnComplete) {
+        public static void RequestQuerySplatEdge(Vector2 position, Action<uint, NativeArray<Vector2>> OnComplete) {
             throw new System.NotImplementedException();
         }
         
@@ -75,15 +75,12 @@ namespace Splats {
         public readonly float Size;
         public readonly float Lifetime;
         public readonly Vector2 Sheer;
-        // temp
-        public readonly GameObject Object;
-        public readonly int ID;
+        public readonly uint ID;
 
         public SplatParams(GameObject obj, Vector2 sheer, float size = 1f, float lifetime = 10f) {
             Size = Mathf.Clamp(size, 0f, float.MaxValue);
             Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
             Sheer = sheer;
-            Object = obj;
 
             ID = 0;
         }
@@ -92,7 +89,6 @@ namespace Splats {
             Size     = Mathf.Clamp(size, 0, float.MaxValue);
             Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
             Sheer    = new Vector2(1, 1);
-            Object = obj;
 
             ID = 0;
         }
@@ -101,12 +97,12 @@ namespace Splats {
  
     public readonly struct SplatEditData {
         public readonly Type EditType;
-        public readonly int SourceID;
-        public readonly int TargetID;
+        public readonly uint SourceID;
+        public readonly uint TargetID;
         public readonly float Radius;
         
         
-        public SplatEditData(Type type, int sourceID, int targetID, float radius = 0.25f) {
+        public SplatEditData(Type type, uint sourceID, uint targetID, float radius = 0.25f) {
             EditType = type;
             SourceID = sourceID;
             TargetID = targetID;
@@ -121,10 +117,10 @@ namespace Splats {
     }
 
     public readonly struct SplatHit {
-        public readonly int ID;
+        public readonly uint ID;
         public readonly float Lifetime;
 
-        public SplatHit(int id, float lifetime = 0) {
+        public SplatHit(uint id, float lifetime = 0) {
             ID = id;
             Lifetime = lifetime;
         }

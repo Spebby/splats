@@ -42,7 +42,7 @@ namespace Splats {
                 bounds    = tempC;
             }
 
-            splats[back]    = Object.Instantiate(@params.Object, position, rotation);
+            //splats[back]    = Object.Instantiate(@params.Object, position, rotation);
             lifetimes[back] = @params.Lifetime;
             bounds[back] = splats[back].GetComponent<Renderer>().bounds;
         }
