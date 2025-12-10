@@ -1,0 +1,59 @@
+// SkewTextureFromAtlas.compute
+#pragma kernel CSMain
+
+// Source atlas texture
+Texture2D<float4> SourceAtlas;
+SamplerState samplerSourceAtlas;
+
+// Output render texture
+RWTexture2D<float4> Result;
+
+struct PaintData {
+    float2 Position;
+    float2 SpriteDimensions;
+    float4 AtlasRegion;     // x, y = offset, z,w = size
+    float4 InverseTransformMatrix;
+};
+
+StructuredBuffer<PaintData> _Data;
+
+// Output dimensions
+int2 OutputSize;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID) {
+    if (id.x >= (uint)OutputSize.x || id.y >= (uint)OutputSize.y) return;
+    PaintData data = _Data[id.z];
+    
+    float2x2 invMatrix = float2x2(
+        data.InverseTransformMatrix.x,
+        data.InverseTransformMatrix.y,
+        data.InverseTransformMatrix.z,
+        data.InverseTransformMatrix.w
+    );
+
+    float2 pixelPos = float2(id.x, id.y);
+    float2 centeredPixel = pixelPos - data.Position;
+    float2 transformedPixel = mul(invMatrix, centeredPixel);
+    
+    // Now transformedPixel is in the sprite's local coordinate system
+    // Center it so (0,0) is the sprite center
+    // Convert to UV by dividing by sprite dimensions and offsetting
+    float2 spriteUV = (transformedPixel / data.SpriteDimensions) + 0.5;
+    
+    // W/ adjusted UV, throw out information from atlas in UV region.
+    if (spriteUV.x < 0 || spriteUV.x > 1 || spriteUV.y < 0 || spriteUV.y > 1) {
+        Result[id.xy] = float4(0, 0, 0, 0);
+        return;
+    }
+    
+    // Map to atlas region
+    float2 atlasUV = data.AtlasRegion.xy + spriteUV * data.AtlasRegion.zw;
+    uint width, height;
+    SourceAtlas.GetDimensions(width, height);
+
+    // Convert to pixel coords
+    int2 pixelCoord = int2(atlasUV.x * width, atlasUV.y * height);
+    float4 color = SourceAtlas.Load(int3(pixelCoord, 0));
+    Result[id.xy] = color;
+}

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 7d317d49d4904dc7a10293375dc46197
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - skewShader: {fileID: 7200000, guid: be6fa246937c4fa880f1421a805fc0e9, type: 3}
+  - sprite: {instanceID: 0}
+  - outputTexture: {fileID: 8400000, guid: 3dfa95fb4f4a51047a412ba5d9ec64a2, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
