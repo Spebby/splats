@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Splats.TextureChunks;
 using Unity.Collections;
 using UnityEngine;
@@ -24,15 +25,16 @@ namespace Splats {
             OnSplat        = null;
         }
         
-        public static void Spawn(Vector2 position, Quaternion rotation, SplatParams @params) {
-            _splatsManager.Spawn(position, rotation, @params);
+        public static void Spawn(Vector2 position, SplatParams @params) {
+            _splatsManager.Spawn(position, @params);
             OnSplat?.Invoke(@params.ID, position);
         }
 
         public static void Edit(Vector2 pos, SplatEditData edit) {
-            
+            throw new NotImplementedException();
         }
 
+        /*
         public static void RequestQuery(Vector2 position, Action<uint> onComplete) {
             throw new System.NotImplementedException();
         }
@@ -40,6 +42,7 @@ namespace Splats {
         public static void RequestQuerySplatEdge(Vector2 position, Action<uint, NativeArray<Vector2>> OnComplete) {
             throw new System.NotImplementedException();
         }
+        */
         
         public static SplatHit Query(Vector2 position, float radius) {
             return _splatsManager.Query(position, radius);
@@ -66,32 +69,41 @@ namespace Splats {
         // this is prolly bad
         internal void Init(ISplatsConfig conf);
         
-        void Spawn(Vector2 position, Quaternion rotation, SplatParams @params);
+        void Spawn(Vector2 position, SplatParams @params);
         SplatHit Query(Vector2 position, float radius);
         NativeArray<SplatHit> Query(NativeArray<Vector2> positions, NativeArray<float> radii, Allocator allocator = Allocator.Temp);
     }
     
     public readonly struct SplatParams {
-        public readonly float Size;
         public readonly float Lifetime;
-        public readonly Vector2 Sheer;
+        public readonly Matrix2x2 Transformation;
         public readonly uint ID;
 
-        public SplatParams(GameObject obj, Vector2 sheer, float size = 1f, float lifetime = 10f) {
-            Size = Mathf.Clamp(size, 0f, float.MaxValue);
-            Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
-            Sheer = sheer;
+        public SplatParams(uint id, float rotation, float size = 1f, float lifetime = 10f) {
+            Transformation = new Matrix2x2(size, 0, 0, size);
 
-            ID = 0;
+            float sin = Mathf.Sin(rotation);
+            float cos = Mathf.Cos(rotation);
+            Transformation *= new Matrix2x2(cos, -sin, sin, cos);
+            
+            Lifetime = LifetimeClamp(lifetime);
+            ID             = id;
         }
 
         public SplatParams(GameObject obj, float size = 1f, float lifetime = 10f) {
-            Size     = Mathf.Clamp(size, 0, float.MaxValue);
-            Lifetime = Mathf.Clamp(lifetime, 0f, float.MaxValue);
-            Sheer    = new Vector2(1, 1);
-
-            ID = 0;
+            Transformation = new Matrix2x2(size, 0, 0, size);
+            Lifetime = LifetimeClamp(lifetime);
+            ID       = 0;
         }
+
+        public SplatParams(uint id, Matrix2x2 transformation, float lifetime = 10f) {
+            Transformation = transformation;
+            Lifetime = LifetimeClamp(lifetime);
+            ID       = id;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static float LifetimeClamp(float l) => Mathf.Clamp(l > 0 ? l : -1, -1f, float.MaxValue);
     }
 
  

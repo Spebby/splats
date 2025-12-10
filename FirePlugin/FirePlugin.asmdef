@@ -1,8 +1,10 @@
 {
-    "name": "Spalts.Runtime.Tests",
-    "rootNamespace": "Splats",
+    "name": "FirePlugin",
+    "rootNamespace": "",
     "references": [
-        "GUID:2671253a9924989308173660915b0873"
+        "GUID:2671253a9924989308173660915b0873",
+        "GUID:a086f2f33537541d1b1e8cde513be9e4",
+        "GUID:e0cd26848372d4e5c891c569017e11f1"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

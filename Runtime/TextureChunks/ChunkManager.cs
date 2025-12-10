@@ -39,10 +39,10 @@ namespace Splats.TextureChunks {
         }
         
         
-        public Vector2 ChunkToWorld(Vector2Int chunk) => chunk * ChunkSize;
-        public Vector2 ChunkToWorld(Vector2 chunk) => chunk * ChunkSize;
-        public Vector2 ChunkToWorldBL(Vector2Int chunk) => new(chunk.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunk.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
-        public Vector2 ChunkToWorldBL(Vector2 chunk) => new(chunk.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunk.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
+        public Vector2 ChunkToWorld(Vector2Int chunkPos) => chunkPos * ChunkSize;
+        public Vector2 ChunkToWorld(Vector2 chunkPos) => chunkPos * ChunkSize;
+        public Vector2 ChunkToWorldBL(Vector2Int chunkPos) => new(chunkPos.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunkPos.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
+        public Vector2 ChunkToWorldBL(Vector2 chunkPos) => new(chunkPos.x * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f), chunkPos.y * ChunkSize - Mathf.FloorToInt(ChunkSize * 0.5f));
         
         public void SetTarget(Transform target) => this.target = target;
 

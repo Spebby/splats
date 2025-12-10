@@ -1,6 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Gilzoide.UpdateManager;
 using Splats.TextureChunks;
 using Unity.Collections;
@@ -8,17 +9,20 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Color = UnityEngine.Color;
+using Random = UnityEngine.Random;
 
 
 namespace Splats {
     public class GPUSplatManager : ISplatsManager, IUpdatable, ILateUpdatable {
-        ComputeShader lifetimeCompute;
+        ComputeShader occupancyCompute;
         ComputeShader queryCompute;
         static readonly int SPLAT_MAP = Shader.PropertyToID("_SplatMap");
         static readonly int OUT_VALUE = Shader.PropertyToID("_OutValue");
         static readonly int CHUNKS = Shader.PropertyToID("_Chunks");
         static readonly int CHUNK_SLICE_MAP = Shader.PropertyToID("_ChunkSliceMap");
         static readonly int QUERY_PARAMS = Shader.PropertyToID("_QueryParams");
+        static readonly int SPLAT_TEX = Shader.PropertyToID("_SplatTex");
+        static readonly int SPLAT_SPAWNS = Shader.PropertyToID("_splatSpawns");
 
         ChunkManager cm;
         ISplatsConfig conf;
@@ -28,6 +32,9 @@ namespace Splats {
 
         CommandBuffer genCmb;
         RenderTexture cameraTexture;
+        
+        // like a semaphore gate
+        int readingGPU;
 
         void ISplatsManager.Init(ISplatsConfig c) {
             // TODO: fine for now but replace
@@ -67,11 +74,25 @@ namespace Splats {
 
 
         void SyncChunks() {
-            Vector2Int currCentre = sChunks[sChunks.Length / 2].chunkCoord;
-            ShiftChunks(currCentre - cm.CentreChunk);
+            Vector2Int currCentre    = sChunks[sChunks.Length / 2].chunkCoord;
+            Vector2Int offset = currCentre - cm.CentreChunk;
+            if (offset == Vector2Int.zero) return;
+
+            _ = SyncChunksAsync(offset);
+        }
+
+        async Task SyncChunksAsync(Vector2Int offset) {
+            // Wait for all GPU readbacks to finish
+            while (readingGPU > 0) {
+                await Task.Yield(); // yield to Unity's main thread
+            }
+
+            ShiftChunks(offset);
             Debug.Log($"New centre: {cm.CentreChunk}");
             
-            // TODO: handle stitching for chunk boundaries.
+            // Todo: handle stitching for chunk boundaries.
+            // We only need to worry about stitching for chunks that are either in view, or next to newly generated chunks
+            // No point in wasting compute stitching what'll likely be culled next shift.
             // Remove any splats that would get cutoff by the removal.
             
             Shader.SetGlobalTexture(CHUNKS, sTexture);
@@ -79,12 +100,13 @@ namespace Splats {
             // maybe chunks overlap each other slightly
         }
 
+        
         // Shift chunks by some offset
         // Limitation: this function assumes movement is continuous (no more than <+-1,+-1> movement) between chunks
         // For larger offsets, it really should just regenerate everything from scratch.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ShiftChunks(Vector2Int offset) {
             // It's important to remember that *offset* is the opposite of the player's movement direction.
-            if (offset == Vector2Int.zero) return;
             int count = sChunks.Length;
             int layer = cm.Layers;
             int n     = layer + layer - 1;
@@ -141,22 +163,139 @@ namespace Splats {
                 return ((v + l) % len + len) % len - l;
             }
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        readonly struct SplatSpawnData {
+            public readonly int ChunkIndex;
+            public readonly int startX;
+            public readonly int startY;
+            public readonly int endX;
+            public readonly int endY;
+            public readonly Vector4 UVRect;
+            public readonly Vector4 Matrix;
+            public readonly uint ID;
+
+            public SplatSpawnData(uint id, Vector2 origin, Vector2 extents, Matrix2x2 matrix, Vector4 uvRect, int chunkIndex) {
+                startX     = Mathf.FloorToInt(origin.x);
+                startY     = Mathf.FloorToInt(origin.y);
+                endX       = Mathf.CeilToInt(origin.x + extents.x);
+                endY       = Mathf.CeilToInt(origin.y + extents.y);
+                UVRect     = uvRect;
+                Matrix     = new Vector4(matrix.m00, matrix.m01, matrix.m10, matrix.m11);
+                ChunkIndex = chunkIndex;
+                ID         = id;
+            }
+        }
         
-        public void Spawn(Vector2 position, Quaternion rotation, SplatParams @params) {
-            
+        const int KERNEL_SPAWN = 0;
+        const int KERNEL_LIFETIME = 1;
+        public void Spawn(Vector2 position, SplatParams @params) {
             // first, assemble the splat texture.
+            // I'd like to have done this now, but time is tight, and I'd rather get a basic version working.
+            // For now, side stepping by just getting a single, random texture.
+            
             // For now, just select a random one
-            ISplatSettings conf = SplatsRegistry.Get(@params.ID);
+            ISplatSettings splatSettings = SplatsRegistry.Get(@params.ID);
+            Sprite splatSprite = splatSettings.RandomTexture;
+            
+            // we can reasonably assume sprites are packed, so we should account for that
+            Texture2D texture = splatSprite.texture;
+            Rect spriteUV = splatSprite.textureRect;
+            Vector4 uvRect = new(
+                spriteUV.xMin / splatSprite.texture.width,
+                spriteUV.yMin / splatSprite.texture.height,
+                spriteUV.width / splatSprite.texture.width,
+                spriteUV.height / splatSprite.texture.height
+            );
+            
+            float r = ComputeWorldRadius(@params.Transformation, splatSprite.bounds.extents.x);
+            Vector2 splatTR = new( r + position.x,  r + position.y);
+            Vector2 splatTL = new(-r + position.x,  r + position.y);
+            Vector2 splatBR = new( r + position.x, -r + position.y);
+            Vector2 splatBL = new(-r + position.x, -r + position.y);
+            
+            int       count = 0;
+            Span<int> arr   = stackalloc int[4];
+            AddUnique(arr, cm.PosToChunkIndex(splatTR));
+            AddUnique(arr, cm.PosToChunkIndex(splatTL));
+            AddUnique(arr, cm.PosToChunkIndex(splatBR));
+            AddUnique(arr, cm.PosToChunkIndex(splatBL));
+
+            // calculate rects & dispatch
+            ComputeBuffer ssdbuff = new(count, Marshal.SizeOf<SplatSpawnData>());
+            NativeArray<SplatSpawnData> ssdbuffTemp = new(count, Allocator.Temp);
+            for (int i = 0; i < count; i++) {
+                Vector2 chunkBL = cm.ChunkToWorldBL(sChunks[arr[i]].chunkCoord);
+                Vector2 chunkTL = new(chunkBL.x + cm.ChunkSize, chunkBL.y + cm.ChunkSize);
+                RectOverlap(splatBL, splatTR, chunkBL, chunkTL, out Vector2 overlapBL, out Vector2 overlapTR);
+                RectInt srcRect = WorldToDstPixels(overlapBL, overlapTR, chunkBL, conf.PixelsPerUnit);
+                int     w       = cm.ChunkSize * conf.PixelsPerUnit;
+                ClampRect(srcRect, w, w);
+                if (srcRect.width == 0) continue;
+                
+                // dispatch or prep to be batch dispatch
+                int sliceIndex = sliceMap[arr[i]];
+                ssdbuffTemp[i] = new SplatSpawnData(@params.ID, srcRect.min, srcRect.max, @params.Transformation, uvRect, sliceIndex);
+            }
+            ssdbuff.SetData(ssdbuffTemp);
+            ssdbuffTemp.Dispose();
+            
+            // send dis shit to GPU for painting
+            occupancyCompute.SetBuffer(KERNEL_SPAWN, SPLAT_SPAWNS, ssdbuff);
+            occupancyCompute.SetTexture(KERNEL_SPAWN, SPLAT_TEX, texture);
+            
+            //occupancyCompute.Dispatch(KERNEL_SPAWN, count, 1, 1); 
             
             
-            Shader.SetGlobalTexture(CHUNKS, sTexture);
-            // sending to gpu 4x is probably best for chunk boundaries
+            // read updates to render textures from GPU (only ones we've updated)
+            // do this async
+            readingGPU++;
+            AsyncGPUReadback.Request(sTexture, 0, TextureFormat.RFloat, OnCompleteSpawnReadback);
+            
+            // we do not need to re-update the occupancy map since it's already up to date.
+            return;
+
+            void AddUnique(Span<int> arr, int value) {
+                for (int i = 0; i < count; i++) {
+                    if (arr[i] == value) return;
+                }
+
+                arr[count++] = value;
+            }
         }
 
+        void OnCompleteSpawnReadback(AsyncGPUReadbackRequest request) {
+            // readback data
+            
+            readingGPU--;
+        }
+
+        // Used to calculate a mock worst case bounding box for a transformed splat.
+        static float ComputeWorldRadius(Matrix2x2 m, float width) {
+            // sprite local half-size in world units
+            Vector2[] corners = {
+                new(-width, -width),
+                new(-width,  width),
+                new( width, -width),
+                new( width,  width)
+            };
+
+            float max = 0f;
+            // ReSharper disable once LoopCanBeConvertedToQuery
+            foreach (Vector2 c in corners) {
+                Vector2 t = m * c;
+                float   r = t.magnitude;
+                if (r > max)
+                    max = r;
+            }
+
+            return max;
+        }
+        
         const int KERNEL_QUERY = 0;
        
         // Data holder for marshalling data to GPU
-        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
+        [StructLayout(LayoutKind.Sequential)]
         readonly struct SQueryParams {
             public readonly int ChunkSlice;
             public readonly int MinPx, MinPy, MaxPx, MaxPy;
@@ -262,6 +401,7 @@ namespace Splats {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void EnsureCameraTexture(Camera cam) {
+            // TODO: this currently doesn't account for PPU properly
             if (!cameraTexture || cameraTexture.width != cam.pixelWidth || cameraTexture.height != cam.pixelHeight) {
                 if (cameraTexture) cameraTexture.Release();
                 cameraTexture = new RenderTexture(cam.pixelWidth,
@@ -308,12 +448,11 @@ namespace Splats {
                 RectInt srcRect = WorldToDstPixels(overlapBL, overlapTR, chunkBL, ppu);
                 RectInt dstRect = WorldToDstPixels(overlapBL, overlapTR, camBL, camPpu);
 
-                int                    w   = cm.ChunkSize * conf.PixelsPerUnit;
+                int w   = cm.ChunkSize * conf.PixelsPerUnit;
                 srcRect = ClampRect(srcRect, w, w);
                 dstRect = ClampRect(dstRect, cameraTexture.width, cameraTexture.height);
 
-                if (srcRect.width == 0 || dstRect.width == 0)
-                    continue;
+                if (srcRect.width == 0 || dstRect.width == 0) continue;
 
                 // copyTexture over blit, b/c we just want to copy pixels without any filtering/scaling
                 RenderTargetIdentifier rti = new(sTexture, 0, CubemapFace.Unknown, sliceMap[i]);

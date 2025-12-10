@@ -1,5 +1,6 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel Spawn
+#pragma kernel Lifetime
 
 // Globals
 Texture2DArray<half2> _Chunks;
@@ -11,8 +12,34 @@ struct Chunk {
     int size;
 };
 
+// Splat specific
+Texture2D _SplatTex;
+groupshared float2x2 _splatMatrix;
+
+struct SplatSpawnData {
+    int chunkIndex;           // Which chunk this splat belongs to
+    int startX;
+    int startY;
+    int endX;
+    int endY;
+    float4 uvRect;            // Packed UV rect in atlas
+    float4 linTran;           // 2x2 transform matrix packed as float4
+    uint id;
+};
+
+StructuredBuffer<SplatSpawnData> _splatsSpawns;
 
 [numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID) {
+void Spawn(uint3 tid : SV_DispatchThreadID) {
+    if (tid.x == 0 && tid.y == 0) {
+        _splatMatrix = float2x2(_SplatTransform.x, _SplatTransform.y, _SplatTransform.z, _SplatTransform.w);
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    // proceed
+}
+
+[numthreads(8,8,1)]
+void Lifetime(uint3 tid : SV_DispatchThreadID) {
     
 }

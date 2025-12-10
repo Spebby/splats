@@ -5,6 +5,8 @@
   "description": "Efficient GPU based splats system for top-down games.",
   "unity": "6000.2",
   "dependencies": {
-    "com.gilzoide.update-manager": "https://github.com/gilzoide/unity-update-manager.git#1.5.3"
+	"com.gilzoide.update-manager": "https://github.com/gilzoide/unity-update-manager.git#1.5.3",
+    "com.unity.addressables": "2.7.4",
+    "com.unity.collections": "2.5.7"
   }
 }

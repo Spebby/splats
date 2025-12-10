@@ -25,7 +25,7 @@ namespace Splats {
             this.RegisterInManager();
         }
 
-        public void Spawn(Vector2 position, Quaternion rotation, SplatParams @params) {
+        public void Spawn(Vector2 position, SplatParams @params) {
             back++;
             if (back == count) {
                 count <<= 1;

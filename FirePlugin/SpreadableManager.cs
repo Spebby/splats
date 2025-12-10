@@ -21,6 +21,7 @@ public class SpreadableManager : IFixedUpdatable {
     }
 
     public void StartFire(Vector2 position, float radius = SAMPLE_SIZE) {
+        /*
         SplatsMan.RequestQuery(position, id => {
             if (!IsBurnable(id)) return;
             SplatsMan.Edit(position, new SplatEditData(type: SplatEditData.Type.Replace,
@@ -33,6 +34,7 @@ public class SpreadableManager : IFixedUpdatable {
                 _frontier.AddRange(array);
             });
         });
+        */
     }
 
     bool IsBurnable(uint id) {
@@ -42,18 +44,20 @@ public class SpreadableManager : IFixedUpdatable {
         };
     }
 
-    void ProcessNewSplat(int ID, Vector2 Position) {
+    void ProcessNewSplat(uint ID, Vector2 Position) {
         // worry about this shit later
         return;
         
         // issue: consider case where oil is spawned far away from fire. should not be on fire
         // consider case where oil is in fire, should be lit on fire.
         // how do we efficiently do this? Probably process along the edges.
+        /*
         SplatsMan.RequestQuerySplatEdge(Position, (id, array) => {
             
             
             
         });
+        */
     }
 
     static readonly Vector2[] SPREAD_OFFSETS = {
