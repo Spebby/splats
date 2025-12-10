@@ -13,7 +13,7 @@ using Random = UnityEngine.Random;
 
 
 namespace Splats {
-    public class GPUSplatManager : ISplatsManager, IUpdatable, ILateUpdatable {
+    public class GPUSplatManager : ISplatsManager, IFixedUpdatable, ILateUpdatable {
         ComputeShader occupancyCompute;
         ComputeShader queryCompute;
         static readonly int SPLAT_MAP = Shader.PropertyToID("_SplatMap");
@@ -31,6 +31,7 @@ namespace Splats {
         int[] sliceMap;
 
         CommandBuffer genCmb;
+        CommandBuffer occSync;
         RenderTexture cameraTexture;
         
         // like a semaphore gate
@@ -43,6 +44,7 @@ namespace Splats {
             cm.OnChunkUpdate += SyncChunks;
 
             genCmb  = new CommandBuffer();
+            occSync = new CommandBuffer { name = "Occupancy Sync" };
             sChunks = new SplatChunk[cm.Chunks.Length];
             for (int i = 0; i < sChunks.Length; i++) {
                 sChunks[i] = new SplatChunk(cm.Chunks[i],
@@ -71,7 +73,6 @@ namespace Splats {
             sTexture = null;
             genCmb.Dispose();
         }
-
 
         void SyncChunks() {
             Vector2Int currCentre    = sChunks[sChunks.Length / 2].chunkCoord;
@@ -244,8 +245,8 @@ namespace Splats {
             occupancyCompute.SetBuffer(KERNEL_SPAWN, SPLAT_SPAWNS, ssdbuff);
             occupancyCompute.SetTexture(KERNEL_SPAWN, SPLAT_TEX, texture);
             
-            //occupancyCompute.Dispatch(KERNEL_SPAWN, count, 1, 1); 
-            
+            //occSync.DispatchCompute(occupancyCompute, KERNEL_SPAWN, count, 1, 1); 
+            //Graphics.ExecuteCommandBuffer(occSync);
             
             // read updates to render textures from GPU (only ones we've updated)
             // do this async
@@ -349,7 +350,7 @@ namespace Splats {
             ComputeBuffer qpBuf  = new(count, stride);
             ComputeBuffer outBuf = new(count, sizeof(uint));
             qpBuf.SetData(qps);
-
+            
             queryCompute.SetBuffer(KERNEL_QUERY, QUERY_PARAMS, qpBuf);
             queryCompute.SetBuffer(KERNEL_QUERY, OUT_VALUE, outBuf);
             // 1 group per query
@@ -392,8 +393,18 @@ namespace Splats {
                 return sqp;
             }
         }
-        
-        public void ManagedUpdate() { }
+
+        // this runs maybe too frequently, but I want the lifetime decrement to not be frame based.
+        // 
+        public void ManagedFixedUpdate() {
+            int threadGroupsX = Mathf.CeilToInt(1024 / 8.0f);
+            int threadGroupsY = Mathf.CeilToInt(1024 / 8.0f);
+            Graphics.ExecuteCommandBuffer(occSync);
+            occSync.Clear();
+            
+            // do this next frame
+            occSync.DispatchCompute(occupancyCompute, KERNEL_LIFETIME, threadGroupsX, threadGroupsY, sChunks.Length);
+        }
 
         public void ManagedLateUpdate() {
             StitchChunks(Camera.main);

@@ -3,7 +3,7 @@
 #pragma kernel Lifetime
 
 // Globals
-Texture2DArray<half2> _Chunks;
+RWTexture2DArray<half2> _Chunks;
 StructuredBuffer<int> _SliceMap;
 
 struct Chunk {
@@ -39,7 +39,10 @@ void Spawn(uint3 tid : SV_DispatchThreadID) {
     // proceed
 }
 
+// z is the chunks' index. Assume that this is dispatched w/ enough threads for each layer.
 [numthreads(8,8,1)]
 void Lifetime(uint3 tid : SV_DispatchThreadID) {
-    
+    half2 color = _Chunks[tid];
+    color.g > 0.0 ? color.g -= 0.01 : color = 0;
+    _Chunks[tid] = color;
 }

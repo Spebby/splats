@@ -182,7 +182,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 13.4375
+  orthographic size: 14.0625
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -294,13 +294,14 @@ GameObject:
   - component: {fileID: 64358360}
   - component: {fileID: 64358362}
   - component: {fileID: 64358361}
+  - component: {fileID: 64358363}
   m_Layer: 0
   m_Name: Test2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &64358360
 Transform:
   m_ObjectHideFlags: 0
@@ -372,6 +373,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &64358363
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 64358359}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 328e449b87f3df4888abf721a60bd9d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spalts.Runtime.Tests::Splats.Test.Runtime.ScaleToCameraSize
 --- !u!1 &466654026 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2438620283971971394, guid: f92622a858eca73ecaf0743a9ddc3d02, type: 3}
@@ -407,7 +420,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1852271330
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -434,6 +447,8 @@ MonoBehaviour:
   Scale: 1
   SkewX: 0
   SkewY: 0
+  showBoundingBox: 1
+  boundingBoxColor: {r: 0, g: 1, b: 0, a: 1}
   outputSize: {x: 128, y: 128}
 --- !u!4 &1852271331
 Transform:
@@ -461,13 +476,14 @@ GameObject:
   - component: {fileID: 1961633816}
   - component: {fileID: 1961633815}
   - component: {fileID: 1961633814}
+  - component: {fileID: 1961633817}
   m_Layer: 0
   m_Name: Test
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!33 &1961633814
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -534,11 +550,23 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 10}
-  m_LocalScale: {x: 25.666666, y: 25.666666, z: 1}
+  m_LocalScale: {x: 1, y: 26.8, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 11380761}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1961633817
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1961633813}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 328e449b87f3df4888abf721a60bd9d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spalts.Runtime.Tests::Splats.ScaleToCameraSize
 --- !u!1001 &4626453742909758126
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -553,7 +581,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2438620283971971394, guid: f92622a858eca73ecaf0743a9ddc3d02, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4312346493481867638, guid: f92622a858eca73ecaf0743a9ddc3d02, type: 3}
       propertyPath: m_LocalPosition.x

@@ -1,4 +1,3 @@
-// SkewTextureFromAtlas.compute
 #pragma kernel CSMain
 
 // Source atlas texture
@@ -8,45 +7,38 @@ SamplerState samplerSourceAtlas;
 // Output render texture
 RWTexture2D<float4> Result;
 
+// Sprite data struct
 struct PaintData {
     float2 Position;
     float2 SpriteDimensions;
-    float4 AtlasRegion;     // x, y = offset, z,w = size
-    float4 InverseTransformMatrix;
+    float4 AtlasRegion;        // xy = offset, zw = size (normalized UV)
+    float4 InvTransformMatrix;
 };
 
 StructuredBuffer<PaintData> _Data;
-
-// Output dimensions
 int2 OutputSize;
+float2 RegionOffset;
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID) {
-    if (id.x >= (uint)OutputSize.x || id.y >= (uint)OutputSize.y) return;
+    float2 pixelPos = float2(id.x, id.y) + RegionOffset;
+    if (pixelPos.x >= (uint)OutputSize.x || pixelPos.y >= (uint)OutputSize.y) return;
+
+    // convert to splat space
     PaintData data = _Data[id.z];
-    
     float2x2 invMatrix = float2x2(
-        data.InverseTransformMatrix.x,
-        data.InverseTransformMatrix.y,
-        data.InverseTransformMatrix.z,
-        data.InverseTransformMatrix.w
+        data.InvTransformMatrix.x,
+        data.InvTransformMatrix.y,
+        data.InvTransformMatrix.z,
+        data.InvTransformMatrix.w
     );
 
-    float2 pixelPos = float2(id.x, id.y);
     float2 centeredPixel = pixelPos - data.Position;
     float2 transformedPixel = mul(invMatrix, centeredPixel);
     
-    // Now transformedPixel is in the sprite's local coordinate system
-    // Center it so (0,0) is the sprite center
-    // Convert to UV by dividing by sprite dimensions and offsetting
     float2 spriteUV = (transformedPixel / data.SpriteDimensions) + 0.5;
-    
-    // W/ adjusted UV, throw out information from atlas in UV region.
-    if (spriteUV.x < 0 || spriteUV.x > 1 || spriteUV.y < 0 || spriteUV.y > 1) {
-        Result[id.xy] = float4(0, 0, 0, 0);
-        return;
-    }
-    
+    if (spriteUV.x < 0 || spriteUV.x > 1 || spriteUV.y < 0 || spriteUV.y > 1) return;
+
     // Map to atlas region
     float2 atlasUV = data.AtlasRegion.xy + spriteUV * data.AtlasRegion.zw;
     uint width, height;
@@ -55,5 +47,6 @@ void CSMain (uint3 id : SV_DispatchThreadID) {
     // Convert to pixel coords
     int2 pixelCoord = int2(atlasUV.x * width, atlasUV.y * height);
     float4 color = SourceAtlas.Load(int3(pixelCoord, 0));
-    Result[id.xy] = color;
+    if (color.a == 0) return;
+    Result[uint2(pixelPos)] = color;
 }

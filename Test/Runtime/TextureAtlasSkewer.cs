@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 
 namespace Splats.Test.Runtime {
@@ -9,6 +10,7 @@ namespace Splats.Test.Runtime {
         static readonly int RESULT = Shader.PropertyToID("Result");
         static readonly int PAINT_DATA = Shader.PropertyToID("_Data");
         static readonly int OUTPUT_SIZE = Shader.PropertyToID("OutputSize");
+        static readonly int REGION_OFFSET = Shader.PropertyToID("RegionOffset");
         
         // GPU data holder
         readonly struct PaintData {
@@ -47,11 +49,16 @@ namespace Splats.Test.Runtime {
         public float Scale;
         public float SkewX;
         public float SkewY;
+       
+        [Header("Debug")]
+        public bool showBoundingBox = true;
+        public Color boundingBoxColor = Color.green;
         
         [Header("Output Settings")]
         public Vector2Int outputSize = new(512, 512);
         int kernelHandle;
         ComputeBuffer paintDataBuffer;
+        Rect lastBoundingBox;
         
         void Start() {
             Debug.Log(Marshal.SizeOf<PaintData>());
@@ -74,6 +81,46 @@ namespace Splats.Test.Runtime {
         }
 
 
+        /// <summary>
+        /// Calculate the axis-aligned bounding box of the transformed sprite
+        /// </summary>
+        Rect CalculateBoundingBox(Vector2 spriteDimensions, Matrix2x2 transform, Vector2 centerPos) {
+            // Define the 4 corners of the sprite in local space (centered at origin)
+            Vector2 halfSize = spriteDimensions * 0.5f;
+            Vector2[] corners = {
+                new(-halfSize.x, -halfSize.y), // BL
+                new( halfSize.x, -halfSize.y), // BR
+                new(-halfSize.x,  halfSize.y), // TL
+                new( halfSize.x,  halfSize.y)  // TR
+            };
+
+            Vector2 min = new(float.MaxValue, float.MaxValue);
+            Vector2 max = new(float.MinValue, float.MinValue);
+
+            // Apply transform then translate to position
+            foreach (Vector2 corner in corners) {
+                Vector2 transformed = transform * corner + centerPos;
+                
+                min.x = Mathf.Min(min.x, transformed.x);
+                min.y = Mathf.Min(min.y, transformed.y);
+                max.x = Mathf.Max(max.x, transformed.x);
+                max.y = Mathf.Max(max.y, transformed.y);
+            }
+
+            // Clamp to output texture bounds
+            min.x = Mathf.Max(0, min.x);
+            min.y = Mathf.Max(0, min.y);
+            max.x = Mathf.Min(outputSize.x, max.x);
+            max.y = Mathf.Min(outputSize.y, max.y);
+
+            return new Rect(
+                min.x, 
+                min.y, 
+                Mathf.Max(0, max.x - min.x), 
+                Mathf.Max(0, max.y - min.y)
+            );
+        }
+        
         void ExecuteSkew() {
             if (!skewShader || !sprite) {
                 Debug.LogError("Missing compute shader or sprite!");
@@ -102,24 +149,38 @@ namespace Splats.Test.Runtime {
                 transformMatrix *= new Matrix2x2(1, SkewX, SkewY, 1);
             }
 
+            // Calculate bounding box for the transformed sprite
+            Rect boundingBox = CalculateBoundingBox(spriteDimensions, transformMatrix, position);
+            lastBoundingBox = boundingBox; // Store for debug visualization
+
+            // If bounding box is empty (sprite is completely off-screen), skip rendering
+            if (boundingBox.width <= 0 || boundingBox.height <= 0) return;
+
             skewShader.SetTexture(kernelHandle, SOURCE_ATLAS, atlasTexture);
             skewShader.SetTexture(kernelHandle, RESULT, outputTexture);
 
-            PaintData     Data      = new (position, spriteDimensions, atlasRegion, transformMatrix.Inverse());
-            PaintData[]   tdBuff    = { Data };
-            if (paintDataBuffer == null || paintDataBuffer.count < tdBuff.Length) {
+            PaintData data = new(position, spriteDimensions, atlasRegion, transformMatrix.Inverse());
+            PaintData[] tdBuff = { data };
+            
+            if (paintDataBuffer?.count < tdBuff.Length) {
                 paintDataBuffer?.Release();
                 paintDataBuffer = new ComputeBuffer(tdBuff.Length, Marshal.SizeOf<PaintData>());
             }
-            paintDataBuffer.SetData(tdBuff);
 
+            paintDataBuffer.SetData(tdBuff);
             skewShader.SetBuffer(kernelHandle, PAINT_DATA, paintDataBuffer);
+            
+            // Set the region offset so shader knows where it's rendering
+            skewShader.SetVector(REGION_OFFSET, new Vector2(boundingBox.x, boundingBox.y));
             skewShader.SetInts(OUTPUT_SIZE, outputSize.x, outputSize.y);
 
-            // dispatch
-            int threadGroupsX = Mathf.CeilToInt(outputSize.x / 8f);
-            int threadGroupsY = Mathf.CeilToInt(outputSize.y / 8f);
-            skewShader.Dispatch(kernelHandle, threadGroupsX, threadGroupsY, tdBuff.Length);
+            // Dispatch only for the bounding box region
+            int regionWidth = Mathf.CeilToInt(boundingBox.width);
+            int regionHeight = Mathf.CeilToInt(boundingBox.height);
+            int threadGroupsX = Mathf.CeilToInt(regionWidth / 8f);
+            int threadGroupsY = Mathf.CeilToInt(regionHeight / 8f);
+            
+            skewShader.Dispatch(kernelHandle, threadGroupsX, threadGroupsY, 1);
         }
         
         void Update() {
@@ -129,6 +190,20 @@ namespace Splats.Test.Runtime {
         void OnDestroy() {
             if (outputTexture) outputTexture.Release();
             paintDataBuffer?.Release();
+        }
+        
+        void OnGUI() {
+            if (!showBoundingBox) return;
+            
+            float posX   = lastBoundingBox.x / outputSize.x * Screen.width;
+            float posY   = Screen.height - (lastBoundingBox.y / outputSize.y * Screen.height);
+            float widthX = lastBoundingBox.width / outputSize.x * Screen.width;
+            float widthY = -(lastBoundingBox.height / outputSize.y * Screen.height);
+            Rect  r      = new(posX, posY, widthX, widthY);
+            
+            // Draw bounding box outline
+            GUI.backgroundColor = boundingBoxColor;
+            GUI.Box(r, GUIContent.none);
         }
     }
 }
